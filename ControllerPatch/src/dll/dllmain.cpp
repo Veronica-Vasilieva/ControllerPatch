@@ -137,7 +137,8 @@ namespace pad {
 // Writable key map (poll thread reads, Lua addon writes via GamePadSetKeyMapping)
 // ---------------------------------------------------------------------------
 namespace {
-    struct BtnKey { WORD base; WORD modded; };
+    // 8-byte packed: guarantees std::atomic<BtnKey> stays lock-free on x86.
+    struct BtnKey { WORD base; WORD lt; WORD rt; WORD _reserved; };
     constexpr int BTN_COUNT = 14;
     const char* const BTN_NAMES[BTN_COUNT] = {
         "A", "B", "X", "Y",
@@ -167,20 +168,20 @@ namespace {
     std::atomic<int> g_pad_mode{0};
 
     std::atomic<BtnKey> g_btn_keys[BTN_COUNT] = {
-        { BtnKey{ '1',          '7' } },           // A
-        { BtnKey{ '2',          '8' } },           // B
-        { BtnKey{ '3',          '9' } },           // X
-        { BtnKey{ '4',          '0' } },           // Y
-        { BtnKey{ '5',          VK_OEM_MINUS } },  // LB
-        { BtnKey{ '6',          VK_OEM_PLUS  } },  // RB
-        { BtnKey{ VK_F1,        VK_F1 } },         // DUP
-        { BtnKey{ VK_F2,        VK_F2 } },         // DDOWN
-        { BtnKey{ VK_F3,        VK_F3 } },         // DLEFT
-        { BtnKey{ VK_F4,        VK_F4 } },         // DRIGHT
-        { BtnKey{ VK_ESCAPE,    VK_ESCAPE } },     // START = ESC (menu)
-        { BtnKey{ 'M',          'M' } },           // BACK = M (map)
-        { BtnKey{ 0, 0 } },                        // L3 (unbound by default)
-        { BtnKey{ 0, 0 } },                        // R3 (unbound by default)
+        { BtnKey{ '1',          '7',          VK_F5,  0 } },  // A
+        { BtnKey{ '2',          '8',          VK_F6,  0 } },  // B
+        { BtnKey{ '3',          '9',          VK_F7,  0 } },  // X
+        { BtnKey{ '4',          '0',          VK_F8,  0 } },  // Y
+        { BtnKey{ '5',          VK_OEM_MINUS, VK_F9,  0 } },  // LB
+        { BtnKey{ '6',          VK_OEM_PLUS,  VK_F10, 0 } },  // RB
+        { BtnKey{ VK_F1,        VK_F1,        VK_F1,  0 } },  // DUP
+        { BtnKey{ VK_F2,        VK_F2,        VK_F2,  0 } },  // DDOWN
+        { BtnKey{ VK_F3,        VK_F3,        VK_F3,  0 } },  // DLEFT
+        { BtnKey{ VK_F4,        VK_F4,        VK_F4,  0 } },  // DRIGHT
+        { BtnKey{ VK_ESCAPE,    VK_ESCAPE,    0,      0 } },  // START
+        { BtnKey{ 'M',          'M',          0,      0 } },  // BACK
+        { BtnKey{ 0, 0, 0, 0 } },                             // L3 (reserved for action ring)
+        { BtnKey{ 0, 0, 0, 0 } },                             // R3
     };
     int button_mask_to_index(WORD mask) {
         for (int i = 0; i < BTN_COUNT; ++i) {
@@ -259,21 +260,18 @@ int __cdecl Script_GamePadSetMode(void* L) {
 }
 
 int __cdecl Script_GamePadSetKeyMapping(void* L) {
-    // Lua signature: GamePadSetKeyMapping(buttonName, baseVk, modVk) -> bool
-    //   buttonName is one of "A","B","X","Y","LB","RB","DUP","DDOWN","DLEFT","DRIGHT"
-    //   baseVk and modVk are Windows virtual-key codes (addon converts WoW
-    //   key names to these before calling us).
+    // Lua: GamePadSetKeyMapping(buttonName, baseVk, ltVk, rtVk) -> bool
     const char* name = L_TOLSTRING(L, 1, nullptr);
     double base_d = L_TONUMBER(L, 2);
-    double mod_d  = L_TONUMBER(L, 3);
+    double lt_d   = L_TONUMBER(L, 3);
+    double rt_d   = L_TONUMBER(L, 4);
     int idx = button_name_to_index(name);
-    if (idx < 0) {
-        L_PUSHBOOLEAN(L, 0);
-        return 1;
-    }
+    if (idx < 0) { L_PUSHBOOLEAN(L, 0); return 1; }
     BtnKey bk;
-    bk.base   = static_cast<WORD>(static_cast<int>(base_d) & 0xFFFF);
-    bk.modded = static_cast<WORD>(static_cast<int>(mod_d)  & 0xFFFF);
+    bk.base      = static_cast<WORD>(static_cast<int>(base_d) & 0xFFFF);
+    bk.lt        = static_cast<WORD>(static_cast<int>(lt_d)   & 0xFFFF);
+    bk.rt        = static_cast<WORD>(static_cast<int>(rt_d)   & 0xFFFF);
+    bk._reserved = 0;
     g_btn_keys[idx].store(bk, std::memory_order_relaxed);
     L_PUSHBOOLEAN(L, 1);
     return 1;
@@ -506,7 +504,7 @@ namespace {
     // override.
     void send_mouse_event(DWORD flags, LONG dx = 0, LONG dy = 0);
 
-    void on_button_edges(WORD prev, WORD now, bool lt_held) {
+    void on_button_edges(WORD prev, WORD now, bool lt_held, bool rt_held) {
         WORD edges = prev ^ now;
         bool focused = wow_window_has_focus();
         bool is_ui   = (g_pad_mode.load(std::memory_order_relaxed) == 1);
@@ -539,12 +537,13 @@ namespace {
             int idx = button_mask_to_index(bit);
             if (idx < 0) continue;
             BtnKey bk = g_btn_keys[idx].load(std::memory_order_relaxed);
-            WORD vk = lt_held ? bk.modded : bk.base;
-            if (!vk) vk = bk.base;
+            // RT takes precedence over LT if both held (user picks one layer).
+            WORD vk = rt_held ? bk.rt : (lt_held ? bk.lt : bk.base);
+            if (!vk) vk = bk.base;      // layer not configured -> fall back
             if (!vk) continue;
             send_vk(vk, down);
             if (down) log_line("[pad0] -> key 0x%02X (%s)",
-                               vk, lt_held ? "LT+" : "base");
+                               vk, rt_held ? "RT+" : (lt_held ? "LT+" : "base"));
         }
     }
 
@@ -645,7 +644,9 @@ namespace {
                 pad::rx.store(p.sThumbRX, std::memory_order_relaxed);
                 pad::ry.store(p.sThumbRY, std::memory_order_relaxed);
 
-                on_button_edges(q.wButtons, p.wButtons, p.bLeftTrigger > 128);
+                on_button_edges(q.wButtons, p.wButtons,
+                                p.bLeftTrigger > 128,
+                                p.bRightTrigger > 128);
                 bool focused = wow_window_has_focus();
                 drive_stick_movement(p.sThumbLX, p.sThumbLY, focused);
                 drive_camera_look   (p.sThumbRX, p.sThumbRY, focused);

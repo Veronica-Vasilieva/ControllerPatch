@@ -24,7 +24,7 @@ local BUTTON_META = {
 }
 
 local cfg = CreateFrame("Frame", "ControllerPatchConfig", UIParent)
-cfg:SetSize(560, 540)
+cfg:SetSize(680, 540)
 cfg:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
 cfg:SetFrameStrata("DIALOG"); cfg:Hide()
 cfg:EnableMouse(true); cfg:SetMovable(true); cfg:RegisterForDrag("LeftButton")
@@ -76,7 +76,7 @@ scroll:SetPoint("TOPLEFT",     22, -70)
 scroll:SetPoint("BOTTOMRIGHT", -38, 48)
 
 local content = CreateFrame("Frame", nil, scroll)
-content:SetSize(500, 10)  -- height set after we know row count
+content:SetSize(620, 10)
 scroll:SetScrollChild(content)
 
 -- Capture state (which row+slot is waiting for a keystroke)
@@ -93,7 +93,7 @@ cfg:SetScript("OnKeyDown", function(self, key)
     end
     if CP.KEY_TO_VK[key] then
         local meta = self.capturing
-        local btn, slot = meta.btn, meta.slot
+        local btn, slot = meta.btn, meta.slot   -- slot is "base" | "lt" | "rt"
         CP.DB.keymap[btn] = CP.DB.keymap[btn] or {}
         CP.DB.keymap[btn][slot] = key
         CP.pushToDLL(btn)
@@ -131,33 +131,29 @@ local function makeRow(parent, index, meta)
     name:SetPoint("LEFT", glyph, "RIGHT", 10, 0); name:SetWidth(140); name:SetJustifyH("LEFT")
     name:SetText(meta.label); name:SetTextColor(1, 0.9, 0.95)
 
-    local baseLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    baseLbl:SetPoint("LEFT", name, "RIGHT", 6, 0); baseLbl:SetText("|cffaa88a0Base:|r")
+    local function makeCol(label, slotKey, anchor, dx)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("LEFT", anchor, "RIGHT", dx, 0); lbl:SetText(label)
+        local b = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        b:SetSize(66, 22); b:SetPoint("LEFT", lbl, "RIGHT", 3, 0)
+        local t = b:GetFontString()
+        b:SetScript("OnClick", function()
+            startCapture(meta.btn, slotKey, t:GetText(), t, b)
+        end)
+        return lbl, b, t
+    end
 
-    local baseBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    baseBtn:SetSize(78, 22); baseBtn:SetPoint("LEFT", baseLbl, "RIGHT", 4, 0)
-    local baseTxt = baseBtn:GetFontString()
-
-    local modLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    modLbl:SetPoint("LEFT", baseBtn, "RIGHT", 10, 0); modLbl:SetText("|cffaa88a0LT:|r")
-
-    local modBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-    modBtn:SetSize(78, 22); modBtn:SetPoint("LEFT", modLbl, "RIGHT", 4, 0)
-    local modTxt = modBtn:GetFontString()
+    local _, baseBtn, baseTxt = makeCol("|cffaa88a0Base:|r", "base", name, 6)
+    local _, ltBtn,   ltTxt   = makeCol("|cffaa88a0LT:|r",   "lt",   baseBtn, 10)
+    local _, rtBtn,   rtTxt   = makeCol("|cffaa88a0RT:|r",   "rt",   ltBtn,   10)
 
     local function refresh()
-        local b, m = CP.getMapping(meta.btn)
+        local b, l, r = CP.getMapping(meta.btn)
         baseTxt:SetText((b == "" and "(none)") or b)
-        modTxt :SetText((m == "" and "(none)") or m)
+        ltTxt  :SetText((l == "" and "(none)") or l)
+        rtTxt  :SetText((r == "" and "(none)") or r)
     end
     refresh()
-
-    baseBtn:SetScript("OnClick", function()
-        startCapture(meta.btn, "base", baseTxt:GetText(), baseTxt, baseBtn)
-    end)
-    modBtn:SetScript("OnClick", function()
-        startCapture(meta.btn, "mod", modTxt:GetText(), modTxt, modBtn)
-    end)
     row.refresh = refresh
     return row
 end

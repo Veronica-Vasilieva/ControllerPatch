@@ -46,21 +46,22 @@ CP.GLYPH = {
 }
 
 -- Default binds mirror the DLL's defaults so round-trip is a no-op first run.
+-- Three layers per button: base (nothing held) / lt (LT held) / rt (RT held).
 CP.DEFAULTS = {
-    A      = { base = "1",  mod = "7" },
-    B      = { base = "2",  mod = "8" },
-    X      = { base = "3",  mod = "9" },
-    Y      = { base = "4",  mod = "0" },
-    LB     = { base = "5",  mod = "-" },
-    RB     = { base = "6",  mod = "=" },
-    DUP    = { base = "F1", mod = "F1" },
-    DDOWN  = { base = "F2", mod = "F2" },
-    DLEFT  = { base = "F3", mod = "F3" },
-    DRIGHT = { base = "F4", mod = "F4" },
-    START  = { base = "ESCAPE", mod = "ESCAPE" },
-    BACK   = { base = "M",      mod = "M" },
-    L3     = { base = "",       mod = "" },
-    R3     = { base = "",       mod = "" },
+    A      = { base = "1",  lt = "7", rt = "F5"  },
+    B      = { base = "2",  lt = "8", rt = "F6"  },
+    X      = { base = "3",  lt = "9", rt = "F7"  },
+    Y      = { base = "4",  lt = "0", rt = "F8"  },
+    LB     = { base = "5",  lt = "-", rt = "F9"  },
+    RB     = { base = "6",  lt = "=", rt = "F10" },
+    DUP    = { base = "F1", lt = "F1", rt = "F1" },
+    DDOWN  = { base = "F2", lt = "F2", rt = "F2" },
+    DLEFT  = { base = "F3", lt = "F3", rt = "F3" },
+    DRIGHT = { base = "F4", lt = "F4", rt = "F4" },
+    START  = { base = "ESCAPE", lt = "ESCAPE", rt = "" },
+    BACK   = { base = "M",      lt = "M",      rt = "" },
+    L3     = { base = "",       lt = "",       rt = "" },
+    R3     = { base = "",       lt = "",       rt = "" },
 }
 
 -- ------------------------------------------------------------
@@ -97,14 +98,15 @@ CP.DB = DB
 
 function CP.getMapping(btn)
     local saved = DB.keymap[btn]
-    local def   = CP.DEFAULTS[btn] or { base="", mod="" }
+    local def   = CP.DEFAULTS[btn] or { base="", lt="", rt="" }
     local b = (saved and saved.base) or def.base
-    local m = (saved and saved.mod)  or def.mod
-    return b, m
+    local l = (saved and saved.lt)   or def.lt
+    local r = (saved and saved.rt)   or def.rt
+    return b, l, r
 end
 
-function CP.setMapping(btn, baseName, modName)
-    DB.keymap[btn] = { base = baseName or "", mod = modName or "" }
+function CP.setMapping(btn, baseName, ltName, rtName)
+    DB.keymap[btn] = { base = baseName or "", lt = ltName or "", rt = rtName or "" }
     CP.pushToDLL(btn)
 end
 
@@ -115,8 +117,8 @@ end
 
 function CP.pushToDLL(btn)
     if not CP.DLL_REMAP_OK then return end
-    local b, m = CP.getMapping(btn)
-    GamePadSetKeyMapping(btn, vkOf(b), vkOf(m))
+    local b, l, r = CP.getMapping(btn)
+    GamePadSetKeyMapping(btn, vkOf(b), vkOf(l), vkOf(r))
 end
 
 function CP.applyAll()

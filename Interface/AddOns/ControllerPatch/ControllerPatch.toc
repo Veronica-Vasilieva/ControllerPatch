@@ -9,3 +9,5 @@ ControllerPatch.lua
 AbilityPad.lua
 ConfigWindow.lua
 UICursor.lua
+TargetHUD.lua
+ActionRing.lua
