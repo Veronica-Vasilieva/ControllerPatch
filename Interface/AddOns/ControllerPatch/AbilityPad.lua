@@ -209,39 +209,55 @@ pad:SetScript("OnDragStart", pad.StartMoving); pad:SetScript("OnDragStop", pad.S
 -- ------------------------------------------------------------
 -- Dynamic action-bar linkage
 -- ------------------------------------------------------------
--- Map pad face/shoulder button -> action slot number per layer
+-- Layer 1 and 2 map pad face buttons to action-bar slot numbers (so we can
+-- show the real spell icon). Layer 3 (RT held) sends arbitrary user-bound
+-- keys so no action-bar slot: we just show the key name under the glyph.
 local SLOT = {
     [1] = { A=1, B=2, X=3, Y=4, LB=5,  RB=6  },
     [2] = { A=7, B=8, X=9, Y=10, LB=11, RB=12 },
 }
 
 local faceWidget = { A = btnA, B = btnB, X = btnX, Y = btnY, LB = btnLB, RB = btnRB }
-local function slotFor(btn, layer) return SLOT[layer][btn] end
+local function slotFor(btn, layer)
+    local m = SLOT[layer]
+    return m and m[btn] or nil
+end
 
 local function updateIcon(btn, widget, layer)
     local slot = slotFor(btn, layer)
-    widget.slotLabel:SetText(tostring(slot))
-    if HasAction and HasAction(slot) and GetActionTexture then
-        local tex = GetActionTexture(slot)
-        if tex then
-            widget.icon:SetTexture(tex)
-            widget.icon:SetVertexColor(1, 1, 1, 1)
+    if slot then
+        -- Layer 1 or 2 -> real action-bar icon + slot label
+        widget.slotLabel:SetText(tostring(slot))
+        if HasAction and HasAction(slot) and GetActionTexture then
+            local tex = GetActionTexture(slot)
+            if tex then
+                widget.icon:SetTexture(tex)
+                widget.icon:SetVertexColor(1, 1, 1, 1)
+            else
+                widget.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+                widget.icon:SetVertexColor(0.5, 0.5, 0.5, 0.7)
+            end
         else
             widget.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-            widget.icon:SetVertexColor(0.5, 0.5, 0.5, 0.7)
+            widget.icon:SetVertexColor(0.4, 0.4, 0.4, 0.6)
+        end
+        if GetActionCooldown then
+            local start, duration = GetActionCooldown(slot)
+            if start and duration and duration > 1.5 then
+                widget.cd:SetCooldown(start, duration)
+            else
+                widget.cd:Hide(); widget.cd:Show()
+            end
         end
     else
+        -- Layer 3 (or any layer without a slot mapping): show the key that
+        -- the DLL will synthesise, pulled from the live binding table.
+        local b, l, r = CP.getMapping(btn)
+        local key = (layer == 3) and r or (layer == 2) and l or b
+        widget.slotLabel:SetText(key ~= "" and key or "-")
         widget.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-        widget.icon:SetVertexColor(0.4, 0.4, 0.4, 0.6)
-    end
-    -- Cooldown sweep
-    if GetActionCooldown then
-        local start, duration = GetActionCooldown(slot)
-        if start and duration and duration > 1.5 then
-            widget.cd:SetCooldown(start, duration)
-        else
-            widget.cd:Hide(); widget.cd:Show()  -- clear
-        end
+        widget.icon:SetVertexColor(0.3, 0.3, 0.4, 0.5)
+        if widget.cd then widget.cd:Hide() end
     end
 end
 
@@ -249,7 +265,7 @@ end
 -- OnUpdate - polls pad state, updates everything at ~20 Hz
 -- ------------------------------------------------------------
 local accum = 0
-local last_lt_held = false
+local last_layer = 1
 pad:SetScript("OnUpdate", function(self, elapsed)
     accum = accum + elapsed
     if accum < 0.08 then return end
@@ -258,18 +274,27 @@ pad:SetScript("OnUpdate", function(self, elapsed)
     local lt = GamePadGetTrigger("LT") or 0
     local rt = GamePadGetTrigger("RT") or 0
     local lt_held = (lt > 0.5)
-    local layer = lt_held and 2 or 1
+    local rt_held = (rt > 0.5)
+    -- RT takes precedence over LT if both held (matches DLL behavior).
+    local layer = rt_held and 3 or (lt_held and 2 or 1)
 
-    layerLabel:SetTextColor(lt_held and 1 or 0.75, lt_held and 0.65 or 0.75, lt_held and 0.85 or 0.75)
-    layerLabel:SetText(lt_held and "|cffff80ffLayer 2 (LT held)|r" or "Layer 1")
-
-    -- Update face/shoulder slots (only on layer change or every ~1s to keep cheap)
-    if lt_held ~= last_lt_held or (math.random() < 0.15) then
-        for btn, w in pairs(faceWidget) do updateIcon(btn, w, layer) end
-        last_lt_held = lt_held
+    if layer == 3 then
+        layerLabel:SetTextColor(1, 0.75, 0.5)
+        layerLabel:SetText("|cffff8060Layer 3 (RT held)|r")
+    elseif layer == 2 then
+        layerLabel:SetTextColor(1, 0.65, 0.85)
+        layerLabel:SetText("|cffff80ffLayer 2 (LT held)|r")
+    else
+        layerLabel:SetTextColor(0.75, 0.75, 0.75)
+        layerLabel:SetText("Layer 1")
     end
 
-    -- Press feedback
+    -- Refresh icons on layer change (and occasionally while idle)
+    if layer ~= last_layer or (math.random() < 0.15) then
+        for btn, w in pairs(faceWidget) do updateIcon(btn, w, layer) end
+        last_layer = layer
+    end
+
     for btn, w in pairs(faceWidget) do
         w:setPressed(GamePadGetButton(btn) and true or false)
     end
