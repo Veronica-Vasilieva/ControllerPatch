@@ -94,7 +94,79 @@ local DB = ControllerPatchDB
 DB.keymap = DB.keymap or {}
 DB.showAbilityPad = (DB.showAbilityPad == nil) and true or DB.showAbilityPad
 DB.showSimpleHUD  = (DB.showSimpleHUD  == nil) and false or DB.showSimpleHUD
+DB.hideBlizzUI    = (DB.hideBlizzUI    == nil) and false or DB.hideBlizzUI
 CP.DB = DB
+
+-- ------------------------------------------------------------
+-- Blizzard default-UI hide toggle. Keeps chat frames visible so the
+-- player can still type.
+-- ------------------------------------------------------------
+local BLIZZ_HIDE = {
+    "MainMenuBar", "MainMenuBarArtFrame", "VehicleMenuBar",
+    "MinimapCluster", "MinimapBackdrop", "MiniMapTracking",
+    "BuffFrame", "TemporaryEnchantFrame", "ConsolidatedBuffs",
+    "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarLeft", "MultiBarRight",
+    "PetActionBarFrame", "ShapeshiftBarFrame", "StanceBarFrame",
+    "CastingBarFrame",
+    "PlayerFrame", "TargetFrame", "FocusFrame", "TargetFrameToT",
+    "PartyMemberFrame1", "PartyMemberFrame2", "PartyMemberFrame3", "PartyMemberFrame4",
+    "WatchFrame",  -- quest tracker in 3.3.5a
+    "CharacterMicroButton", "SpellbookMicroButton", "TalentMicroButton",
+    "AchievementMicroButton", "QuestLogMicroButton", "SocialsMicroButton",
+    "PVPMicroButton", "LFDMicroButton", "MainMenuMicroButton", "HelpMicroButton",
+    "ReputationMicroButton", "GuildMicroButton", "RaidMicroButton",
+    "ActionBarUpButton", "ActionBarDownButton",
+    "KeyRingButton",
+    "WorldStateAlwaysUpFrame",
+    "TutorialFrame",
+}
+
+local hiddenFrames = {}
+local function hideBlizz(hide)
+    if InCombatLockdown and InCombatLockdown() then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff8080[" .. ADDON .. "]|r can't change UI visibility while in combat.")
+        return false
+    end
+    if hide then
+        for _, name in ipairs(BLIZZ_HIDE) do
+            local f = _G[name]
+            if f and f.Hide then
+                pcall(function()
+                    if f:IsShown() then f:Hide() end
+                    if f.UnregisterAllEvents then f:UnregisterAllEvents() end
+                end)
+                hiddenFrames[name] = true
+            end
+        end
+    else
+        for name in pairs(hiddenFrames) do
+            local f = _G[name]
+            if f then
+                pcall(function()
+                    if f.RegisterEvent then
+                        -- Re-register the handful of common frame events; cheap and
+                        -- safe since re-registering an active event is a no-op.
+                        for _, ev in ipairs({"PLAYER_ENTERING_WORLD","UNIT_HEALTH","UNIT_POWER","PLAYER_TARGET_CHANGED","PARTY_MEMBERS_CHANGED","UNIT_AURA"}) do
+                            f:RegisterEvent(ev)
+                        end
+                    end
+                    if f.Show then f:Show() end
+                end)
+            end
+        end
+        hiddenFrames = {}
+    end
+    return true
+end
+
+function CP.setBlizzUIHidden(hide)
+    if hideBlizz(hide) then
+        DB.hideBlizzUI = hide and true or false
+    end
+end
+function CP.toggleBlizzUI()
+    CP.setBlizzUIHidden(not DB.hideBlizzUI)
+end
 
 function CP.getMapping(btn)
     local saved = DB.keymap[btn]
@@ -130,6 +202,7 @@ local bootstrap = CreateFrame("Frame")
 bootstrap:RegisterEvent("PLAYER_LOGIN")
 bootstrap:SetScript("OnEvent", function()
     CP.applyAll()
+    if DB.hideBlizzUI then hideBlizz(true) end
     DEFAULT_CHAT_FRAME:AddMessage("|cffff80ff[" .. ADDON .. " 0.5]|r ready. |cffaaaaaa/cp|r for help.")
 end)
 

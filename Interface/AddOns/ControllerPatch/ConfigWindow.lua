@@ -164,17 +164,27 @@ for i, meta in ipairs(BUTTON_META) do
 end
 content:SetHeight(#BUTTON_META * 38 + 8)
 
--- Reset + Apply buttons at the bottom
+-- Reset + Apply buttons + Blizzard UI toggle at the bottom
 local resetBtn = CreateFrame("Button", nil, cfg, "UIPanelButtonTemplate")
-resetBtn:SetSize(150, 24); resetBtn:SetPoint("BOTTOMLEFT", 24, 14)
+resetBtn:SetSize(130, 24); resetBtn:SetPoint("BOTTOMLEFT", 24, 14)
 resetBtn:SetText("Reset to defaults")
 resetBtn:SetScript("OnClick", function()
     CP.DB.keymap = {}; CP.applyAll()
     for _, r in ipairs(rows) do r.refresh() end
 end)
 
+local blizzBtn = CreateFrame("CheckButton", nil, cfg, "InterfaceOptionsCheckButtonTemplate")
+blizzBtn:SetPoint("BOTTOM", cfg, "BOTTOM", -40, 16)
+blizzBtn.Text:SetText("|cffffffaaHide Blizzard default UI (keeps chat)|r")
+blizzBtn:SetScript("OnShow", function(self) self:SetChecked(CP.DB.hideBlizzUI) end)
+blizzBtn:SetScript("OnClick", function(self)
+    CP.setBlizzUIHidden(self:GetChecked() and true or false)
+    -- If combat-locked the toggle was refused; bounce the checkbox back.
+    self:SetChecked(CP.DB.hideBlizzUI)
+end)
+
 local applyBtn = CreateFrame("Button", nil, cfg, "UIPanelButtonTemplate")
-applyBtn:SetSize(130, 24); applyBtn:SetPoint("BOTTOMRIGHT", -42, 14)
+applyBtn:SetSize(120, 24); applyBtn:SetPoint("BOTTOMRIGHT", -42, 14)
 applyBtn:SetText("Push to DLL")
 applyBtn:SetScript("OnClick", function()
     CP.applyAll()
