@@ -516,20 +516,23 @@ namespace {
             log_line("[pad0] button %s %s", down ? "DOWN" : "UP  ", button_name(bit));
             if (!focused) continue;
 
-            // UI mode overrides for A (left click) and B (ESCAPE) only.
-            // Everything else keeps its configured key mapping so e.g. START
-            // can still toggle the menu, LB/RB can still be bound to shift,
-            // etc.
+            // UI mode: suppress ABXY and D-pad entirely so the addon-side
+            // UICursor module can handle them (D-pad -> move focus between
+            // clickable widgets, A -> button:Click(), B -> close). LB/RB,
+            // triggers, START, BACK, L3/R3 all keep their configured key
+            // mapping so the user can still open bags, chat etc.
             if (is_ui) {
-                if (bit == XINPUT_GAMEPAD_A) {
-                    send_mouse_event(down ? MOUSEEVENTF_LEFTDOWN : MOUSEEVENTF_LEFTUP);
-                    if (down) log_line("[pad0] -> LEFT-CLICK (ui mode)");
+                switch (bit) {
+                case XINPUT_GAMEPAD_A:
+                case XINPUT_GAMEPAD_B:
+                case XINPUT_GAMEPAD_X:
+                case XINPUT_GAMEPAD_Y:
+                case XINPUT_GAMEPAD_DPAD_UP:
+                case XINPUT_GAMEPAD_DPAD_DOWN:
+                case XINPUT_GAMEPAD_DPAD_LEFT:
+                case XINPUT_GAMEPAD_DPAD_RIGHT:
                     continue;
-                }
-                if (bit == XINPUT_GAMEPAD_B) {
-                    send_vk(VK_ESCAPE, down);
-                    if (down) log_line("[pad0] -> ESCAPE (ui mode)");
-                    continue;
+                default: break;
                 }
             }
 

@@ -139,23 +139,21 @@ end)
 --   B -> ESCAPE
 -- Everything else keeps its configured mapping.
 -- ------------------------------------------------------------
-local MODAL_FRAMES = {
-    "GameMenuFrame", "WorldMapFrame", "MerchantFrame", "QuestFrame",
-    "QuestLogFrame", "QuestLogDetailFrame",
-    "CharacterFrame", "PaperDollFrame",
-    "SpellBookFrame", "TalentFrame", "PlayerTalentFrame",
-    "InterfaceOptionsFrame", "VideoOptionsFrame", "AudioOptionsFrame",
-    "OptionsFrame", "ChatConfigFrame", "KeyBindingFrame", "MacroFrame",
+-- Conservative list - only frames that reliably exist and are plainly
+-- hidden by default on 3.3.5a. The config window is handled separately so
+-- it doesn't need to be in here.
+CP.MODAL_FRAMES = {
+    "GameMenuFrame", "WorldMapFrame",
+    "MerchantFrame", "QuestFrame", "QuestLogFrame",
+    "CharacterFrame", "SpellBookFrame",
+    "InterfaceOptionsFrame", "VideoOptionsFrame",
+    "KeyBindingFrame", "MacroFrame",
     "ContainerFrame1","ContainerFrame2","ContainerFrame3","ContainerFrame4","ContainerFrame5",
     "AuctionFrame", "MailFrame", "BankFrame",
-    "FriendsFrame", "WorldStateScoreFrame", "RaidFrame",
-    "ReadyCheckFrame", "StackSplitFrame", "DressUpFrame",
-    "AchievementFrame", "CalendarFrame", "LFDParentFrame",
-    "TradeFrame", "GossipFrame", "PetitionFrame",
-    "TaxiFrame", "BarberShopFrame", "GuildBankFrame",
-    "ItemSocketingFrame", "ItemTextFrame",
-    "ControllerPatchConfig",   -- our own config window counts too
+    "TradeFrame", "GossipFrame", "TaxiFrame",
+    "GuildBankFrame", "ControllerPatchConfig",
 }
+local MODAL_FRAMES = CP.MODAL_FRAMES
 
 local function anyModalOpen()
     for _, name in ipairs(MODAL_FRAMES) do
@@ -170,7 +168,7 @@ local function anyModalOpen()
     return false
 end
 
-local lastMode
+CP.currentMode = "game"
 local modeChecker = CreateFrame("Frame")
 modeChecker.accum = 0
 modeChecker:SetScript("OnUpdate", function(self, elapsed)
@@ -179,9 +177,11 @@ modeChecker:SetScript("OnUpdate", function(self, elapsed)
     self.accum = 0
     if not HAS("GamePadSetMode") then return end
     local mode = anyModalOpen() and "ui" or "game"
-    if mode ~= lastMode then
+    if mode ~= CP.currentMode then
         GamePadSetMode(mode)
-        lastMode = mode
+        CP.currentMode = mode
+        DEFAULT_CHAT_FRAME:AddMessage("|cffaaaaaa[CP]|r mode -> |cffffff80" .. mode .. "|r")
+        if CP.UICursor then CP.UICursor.setActive(mode == "ui") end
     end
 end)
 
