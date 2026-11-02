@@ -1,0 +1,10 @@
+## Interface: 30300
+## Title: ControllerPatch
+## Notes: Xbox controller support for 3.3.5a (DLL + addon)
+## Author: ControllerPatch
+## Version: 0.5
+## SavedVariables: ControllerPatchDB
+
+ControllerPatch.lua
+AbilityPad.lua
+ConfigWindow.lua

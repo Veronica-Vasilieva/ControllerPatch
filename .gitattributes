@@ -1,0 +1,17 @@
+* text=auto eol=lf
+*.cpp text eol=lf
+*.h   text eol=lf
+*.lua text eol=lf
+*.toc text eol=lf
+*.md  text eol=lf
+*.xml text eol=lf
+*.ps1 text eol=lf
+*.manifest text eol=lf
+
+*.blp binary
+*.tga binary
+*.png binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.ghidra-snapshot binary

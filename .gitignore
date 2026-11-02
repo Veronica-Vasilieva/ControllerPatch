@@ -1,0 +1,37 @@
+# By default, ignore everything in the WoW install root. Then whitelist the
+# project directories so git only tracks ControllerPatch sources and the
+# ControllerPatch addon(s).
+
+/*
+
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/ControllerPatch/
+!/Interface/
+
+# Interface: only track our own addons, nothing of Blizzard's.
+/Interface/*
+!/Interface/AddOns/
+/Interface/AddOns/*
+!/Interface/AddOns/ControllerPatch/
+!/Interface/AddOns/ControllerPatchTest/
+
+# Within the project folder, exclude build artifacts and local caches.
+/ControllerPatch/build/
+/ControllerPatch/_downloads/
+/ControllerPatch/*.ghidra-snapshot
+/ControllerPatch/**/*.pdb
+/ControllerPatch/**/*.obj
+/ControllerPatch/**/*.ilk
+/ControllerPatch/**/*.ipdb
+/ControllerPatch/**/*.iobj
+
+# OS / editor junk
+Thumbs.db
+.DS_Store
+.vs/
+.vscode/
+*.swp
+*~

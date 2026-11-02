@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: ControllerPatch Test
+## Notes: Live view of GamePad.* globals exported by ControllerPatch.dll
+## Author: ControllerPatch
+## Version: 1.0
+
+ControllerPatchTest.lua
