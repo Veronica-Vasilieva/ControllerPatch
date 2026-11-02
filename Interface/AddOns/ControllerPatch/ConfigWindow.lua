@@ -173,14 +173,19 @@ resetBtn:SetScript("OnClick", function()
     for _, r in ipairs(rows) do r.refresh() end
 end)
 
-local blizzBtn = CreateFrame("CheckButton", nil, cfg, "InterfaceOptionsCheckButtonTemplate")
+-- UICheckButtonTemplate is the 3.3.5a-safe checkbox; it does not provide
+-- a .Text field so we draw the label ourselves.
+local blizzBtn = CreateFrame("CheckButton", nil, cfg, "UICheckButtonTemplate")
+blizzBtn:SetSize(22, 22)
 blizzBtn:SetPoint("BOTTOM", cfg, "BOTTOM", -40, 16)
-blizzBtn.Text:SetText("|cffffffaaHide Blizzard default UI (keeps chat)|r")
+local blizzLbl = cfg:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+blizzLbl:SetPoint("LEFT", blizzBtn, "RIGHT", 2, 0)
+blizzLbl:SetTextColor(1, 1, 0.65)
+blizzLbl:SetText("Hide Blizzard default UI (keeps chat)")
 blizzBtn:SetScript("OnShow", function(self) self:SetChecked(CP.DB.hideBlizzUI) end)
 blizzBtn:SetScript("OnClick", function(self)
     CP.setBlizzUIHidden(self:GetChecked() and true or false)
-    -- If combat-locked the toggle was refused; bounce the checkbox back.
-    self:SetChecked(CP.DB.hideBlizzUI)
+    self:SetChecked(CP.DB.hideBlizzUI)   -- bounce back if combat-refused
 end)
 
 local applyBtn = CreateFrame("Button", nil, cfg, "UIPanelButtonTemplate")
